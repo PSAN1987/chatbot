@@ -3,94 +3,91 @@ from flask import Flask, request, abort
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
 from linebot.v3.messaging import (
-	ApiClient, Configuration, MessagingApi,
-	ReplyMessageRequest, PushMessageRequest,
-	TextMessage, PostbackAction
+    ApiClient, Configuration, MessagingApi,
+    ReplyMessageRequest, TextMessage
 )
 from linebot.v3.webhooks import (
-	FollowEvent, MessageEvent, PostbackEvent, TextMessageContent
+    FollowEvent, MessageEvent, TextMessageContent
 )
 import os
 
-## .env ファイル読み込み
+# Load .env file
 from dotenv import load_dotenv
 load_dotenv()
 
-## 環境変数を変数に割り当て
+# Assign environment variables to variables
 CHANNEL_ACCESS_TOKEN = os.environ["CHANNEL_ACCESS_TOKEN"]
 CHANNEL_SECRET = os.environ["CHANNEL_SECRET"]
 
-**/.DS_Store  ## 不要な管理ファイルの除外
-**/__pycache__  ## キャッシュファイルの除外
-.env  ## 環境変数ファイル
-venv  ## 仮想環境
-
-## Flask アプリのインスタンス化
+# Instantiate Flask app
 app = Flask(__name__)
 
-## LINE のアクセストークン読み込み
+# Load LINE access token
 configuration = Configuration(access_token=CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(CHANNEL_SECRET)
 
-## コールバックのおまじない
+# Callback function
 @app.route("/callback", methods=['POST'])
 def callback():
-	# get X-Line-Signature header value
-	signature = request.headers['X-Line-Signature']
+    # get X-Line-Signature header value
+    signature = request.headers['X-Line-Signature']
 
-	# get request body as text
-	body = request.get_data(as_text=True)
-	app.logger.info("Request body: " + body)
+    # get request body as text
+    body = request.get_data(as_text=True)
+    app.logger.info("Request body: " + body)
 
-	# handle webhook body
-	try:
-		handler.handle(body, signature)
-	except InvalidSignatureError:
-		app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
-		abort(400)
+    # handle webhook body
+    try:
+        handler.handle(body, signature)
+    except InvalidSignatureError:
+        app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
+        abort(400)
 
-	return 'OK'
+    return 'OK'
 
-## 友達追加時のメッセージ送信
+# Send a message when a friend is added
 @handler.add(FollowEvent)
 def handle_follow(event):
-	## APIインスタンス化
-	with ApiClient(configuration) as api_client:
-		line_bot_api = MessagingApi(api_client)
+    # Instantiate API client
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
 
-	## 返信
-	line_bot_api.reply_message(ReplyMessageRequest(
-		replyToken=event.reply_token,
-		messages=[TextMessage(text='Thank You!')]
-	))
-## オウム返しメッセージ
+        # Reply
+        line_bot_api.reply_message(ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text='Thank You!')]
+        ))
+
+# Echo back received messages
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-	## APIインスタンス化
-	with ApiClient(configuration) as api_client:
-		line_bot_api = MessagingApi(api_client)
+    # Instantiate API client
+    with ApiClient(configuration) as api_client:
+        line_bot_api = MessagingApi(api_client)
 
-	## 受信メッセージの中身を取得
-	received_message = event.message.text
+        # Get the content of the received message
+        received_message = event.message.text
 
-	## APIを呼んで送信者のプロフィール取得
-	profile = line_bot_api.get_profile(event.source.user_id)
-	display_name = profile.display_name
+        # Call API to get sender's profile
+        profile = line_bot_api.get_profile(event.source.user_id)
+        display_name = profile.display_name
 
-	## 返信メッセージ編集
-	reply = f'{display_name}さんのメッセージ\n{received_message}'
+        # Edit reply message
+        reply = f'{display_name}, you said:\n{received_message}'
 
-	## オウム返し
-	line_bot_api.reply_message(ReplyMessageRequest(
-		replyToken=event.reply_token,
-		messages=[TextMessage(text=reply)]
-	))
-## ボット起動コード
-if __name__ == "__main__":
-	## ローカルでテストする時のために、`debug=True` にしておく
-	app.run(host="0.0.0.0", port=8000, debug=True)
-	
-	## 起動確認用ウェブサイトのトップページ
+        # Echo back
+        line_bot_api.reply_message(ReplyMessageRequest(
+            reply_token=event.reply_token,
+            messages=[TextMessage(text=reply)]
+        ))
+
+# Top page for checking if the bot is running
 @app.route('/', methods=['GET'])
 def toppage():
-	return 'Hello world!'
+    return 'Hello world!'
+
+# Bot startup code
+if __name__ == "__main__":
+    # Set `debug=True` for local testing
+    app.run(host="0.0.0.0", port=8000, debug=True)
+
